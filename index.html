@@ -6,15 +6,14 @@
             Star System View Test
         </title>
         <style>
-			body { margin: 0; }
-			canvas { display: block; }
+			body { margin: 0; position: absolute; left: 0; right: 0; top: 0; bottom: 0; }
+            system-view { display: block ; position: absolute; left: 0; right: 0; top: 0; bottom: 0; }
 		</style>
     </head>
     <body>
         <script type="module">
-            import Viewer from './index.js'
-
-            let viewer = new Viewer(document.body)
+            import './index.js'
         </script>
+        <system-view></system-view>
     </body>
 </html>

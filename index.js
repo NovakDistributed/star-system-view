@@ -66,10 +66,14 @@ export default class SystemView extends HTMLElement {
 
     // Define our stylesheet inline.
     // Who knows where external files are?
+    // We need to turn off overflow or our full-size canvas child and
+    // auto-resize logic will create oscilating on/off scrollbars.
     let style = document.createElement('style')
-    style.textContent = 'canvas { display: block; }'
-
-    // Try and figure out how big the element is.
+    style.textContent = `
+    :host { overflow-x: hidden; overflow-y: hidden; }
+    canvas { display: block; }
+    `
+    shadow.appendChild(style);
 
     // Set up ThreeJS
     let scene = new THREE.Scene()
@@ -80,6 +84,7 @@ export default class SystemView extends HTMLElement {
     let renderer = new THREE.WebGLRenderer()
     // Render at full DPI on High DPI displays
     renderer.setPixelRatio(window.devicePixelRatio)
+    // Match the size the custom element is styled to
     renderer.setSize(this.clientWidth, this.clientHeight)
     shadow.appendChild(renderer.domElement)
 
@@ -142,9 +147,9 @@ export default class SystemView extends HTMLElement {
         this.frameRequest = requestAnimationFrame(this.animate)
 
         // Always resize to the size that we actually are on any frame
-        camera.aspect = this.clientWidth / this.clientHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(this.clientWidth, this.clientHeight );
+        camera.aspect = this.clientWidth / this.clientHeight
+        camera.updateProjectionMatrix()
+        renderer.setSize(this.clientWidth, this.clientHeight)
         
         if (lastTime != undefined) {
             let delta_seconds = (time - lastTime) / 1000

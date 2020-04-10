@@ -92,6 +92,10 @@ export default class SystemView extends HTMLElement {
     let material = new THREE.MeshBasicMaterial({color: 0x00ff00})
     let cube = new THREE.Mesh(geometry, material)
     scene.add(cube)
+    
+    let screenspace = new THREE.Group()
+    screenspace.position.z = -1
+    camera.add(screenspace)
 
     let fontUrl = 'https://unpkg.com/three@0.113.2/examples/fonts/helvetiker_regular.typeface.json'
     getFont(fontUrl).then((font) => {
@@ -102,19 +106,19 @@ export default class SystemView extends HTMLElement {
       
       let setText = (message) => {
         if (typeof lastText !== 'undefined') {
-          camera.remove(lastText)
+          screenspace.remove(lastText)
         }
 
         let text = getTextMesh(font, message)
         // Scale to a manageable height. TODO: how big is the text officially?
         // Different strings have different bounding boxes.
-        let shrink = 0.001
+        let shrink = 1
         text.scale.set(shrink, shrink, shrink)
         // Position it so we can see it
-        text.position.z = -1
+        text.position.z = 0
         text.position.y = 0
-        text.position.x = -1.5
-        camera.add(text)
+        text.position.x = 0
+        screenspace.add(text)
         lastText = text
       }
 
@@ -150,6 +154,13 @@ export default class SystemView extends HTMLElement {
         camera.aspect = this.clientWidth / this.clientHeight
         camera.updateProjectionMatrix()
         renderer.setSize(this.clientWidth, this.clientHeight)
+        // Scale so screen space is in pixles
+        // TODO: Doesn't really work. Maybe go 0-1 and then to pixels?
+        screenspace.scale.set(1/this.clientHeight, 1/this.clientWidth, 1.0)
+        // Budge it over to the top left
+        // Needs to compensate for scale
+        screenspace.position.x = 0
+        screenspace.position.y = 0
         
         if (lastTime != undefined) {
             let delta_seconds = (time - lastTime) / 1000

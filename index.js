@@ -91,11 +91,21 @@ export default class SystemView extends HTMLElement {
     let geometry = new THREE.BoxGeometry()
     let material = new THREE.MeshBasicMaterial({color: 0x00ff00})
     let cube = new THREE.Mesh(geometry, material)
-    scene.add(cube)
+    //scene.add(cube)
     
     let screenspace = new THREE.Group()
-    screenspace.position.z = -1
+    screenspace.position.z = -camera.near
     camera.add(screenspace)
+    
+    // Cube is centered on origin, with faces 0.5 away in all directions
+    let screenCube = new THREE.Mesh(geometry, material)
+    screenspace.add(screenCube)
+    screenCube.scale.x = 10
+    screenCube.scale.y = 10
+    screenCube.scale.z = 1E-9
+    screenCube.position.x = 5
+    screenCube.position.y = 5
+    screenCube.position.z = -1E-9/2
 
     let fontUrl = 'https://unpkg.com/three@0.113.2/examples/fonts/helvetiker_regular.typeface.json'
     getFont(fontUrl).then((font) => {
@@ -154,13 +164,22 @@ export default class SystemView extends HTMLElement {
         camera.aspect = this.clientWidth / this.clientHeight
         camera.updateProjectionMatrix()
         renderer.setSize(this.clientWidth, this.clientHeight)
-        // Scale so screen space is in pixles
-        // TODO: Doesn't really work. Maybe go 0-1 and then to pixels?
-        screenspace.scale.set(1/this.clientHeight, 1/this.clientWidth, 1.0)
-        // Budge it over to the top left
-        // Needs to compensate for scale
-        screenspace.position.x = 0
-        screenspace.position.y = 0
+        
+        // Compute FoV Facts
+        // See https://github.com/mrdoob/three.js/issues/1239#issuecomment-3784882
+        let verticalFOV = camera.fov / 180 * Math.PI
+        let horizontalFOV = 2 * Math.atan(Math.tan(verticalFOV / 2) * camera.aspect)
+        let screenSpaceHeight = 2 * Math.tan(verticalFOV / 2) * camera.near
+        let screenSpaceWidth = 2 * Math.tan(horizontalFOV / 2) * camera.near
+        
+        // Scale so that screen space runs in pixels to 1 across the whole screen
+        // Note that 0,0 is bottom left and not top left.
+        // Note also that anything with nonzero thickness will zoom off into space.
+        screenspace.scale.set(screenSpaceWidth / this.clientWidth, screenSpaceHeight / this.clientHeight, 1.0)
+        // Budge it over to the bottom left
+        // Happens after scale
+        screenspace.position.x = -screenSpaceWidth / 2
+        screenspace.position.y = -screenSpaceHeight / 2
         
         if (lastTime != undefined) {
             let delta_seconds = (time - lastTime) / 1000

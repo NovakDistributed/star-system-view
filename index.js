@@ -140,13 +140,9 @@ export default class SystemView extends HTMLElement {
     // Needs to be a child of the camera
     camera.add(screenspace)
     
-    let screenspace2 = new THREE.Sprite()
-    screenspace2.position.z = -camera.near
-    camera.add(screenspace2)
-    
     // Cube is centered on origin, with faces 0.5 away in all directions
     let screenCube = new THREE.Mesh(geometry, material)
-    screenspace2.add(screenCube)
+    screenspace.add(screenCube)
     screenCube.scale.x = 10
     screenCube.scale.y = 10
     screenCube.scale.z = 1E-9
@@ -211,24 +207,6 @@ export default class SystemView extends HTMLElement {
         camera.aspect = this.clientWidth / this.clientHeight
         camera.updateProjectionMatrix()
         renderer.setSize(this.clientWidth, this.clientHeight)
-        
-        // Compute FoV Facts
-        // See https://github.com/mrdoob/three.js/issues/1239#issuecomment-3784882
-        let verticalFOV = camera.fov / 180 * Math.PI
-        let horizontalFOV = 2 * Math.atan(Math.tan(verticalFOV / 2) * camera.aspect)
-        let screenSpaceHeight = 2 * Math.tan(verticalFOV / 2) * camera.near
-        let screenSpaceWidth = 2 * Math.tan(horizontalFOV / 2) * camera.near
-        
-        // Scale so that screen space runs in pixels to 1 across the whole screen
-        // Note that 0,0 is bottom left and not top left.
-        // Note also that anything with nonzero thickness will zoom off into space.
-        screenspace2.scale.set(screenSpaceWidth / this.clientWidth, screenSpaceHeight / this.clientHeight, 1.0)
-        // Budge it over to the bottom left
-        // Happens after scale
-        screenspace2.position.x = -screenSpaceWidth / 2
-        screenspace2.position.y = -screenSpaceHeight / 2
-        
-        console.log(screenspace.position, screenSpace2.position)
         
         if (lastTime != undefined) {
             let delta_seconds = (time - lastTime) / 1000

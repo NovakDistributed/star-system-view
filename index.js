@@ -57,6 +57,48 @@ function getTextMesh(font, message) {
   }
 }
 
+/**
+ * THREE.js scene node that displays everything in screen space. X/Y 0/0 is at the lower left, and each unit is 1 pixel.
+ * Automatically moves around to follow the camera as rendering is happening.
+ *
+ * Takes the element whose clientWidth and clientHeight define the pixel scale of the screen.
+ *
+ * Needs to be a child of the camera to work right.
+ */
+class ScreenSpace extends THREE.Sprite {
+  // We extend Sprite since Group doesn't get a render callback. See https://github.com/mrdoob/three.js/issues/11306
+  // The default Sprite doesn't look like anything.
+  constructor(screenElement) {
+    super()
+    
+    this.screenElement = screenElement
+    
+    this.onBeforeRender = (renderer, scene, camera, geometry, material, group) => {
+      // Compute FoV Facts
+      // See https://github.com/mrdoob/three.js/issues/1239#issuecomment-3784882
+      let verticalFOV = camera.fov / 180 * Math.PI
+      let horizontalFOV = 2 * Math.atan(Math.tan(verticalFOV / 2) * camera.aspect)
+      let screenSpaceHeight = 2 * Math.tan(verticalFOV / 2) * camera.near
+      let screenSpaceWidth = 2 * Math.tan(horizontalFOV / 2) * camera.near
+      
+      // Scale so that screen space runs in pixels to 1 across the whole screen
+      // Note that 0,0 is bottom left and not top left.
+      // Note also that anything with nonzero thickness will zoom off into space.
+      this.scale.set(screenSpaceWidth / this.screenElement.clientWidth,
+                     screenSpaceHeight / this.screenElement.clientHeight,
+                     1.0)
+      // Budge it over to the bottom left
+      // Happens after scale
+      this.position.x = -screenSpaceWidth / 2
+      this.position.y = -screenSpaceHeight / 2
+      this.position.z = -camera.near
+    }
+  }
+}
+
+/**
+ * Main control for a star system view. Displays stars and planets.
+ */
 export default class SystemView extends HTMLElement {
   constructor() {
     super()
@@ -93,20 +135,25 @@ export default class SystemView extends HTMLElement {
     let cube = new THREE.Mesh(geometry, material)
     //scene.add(cube)
     
-    let screenspace = new THREE.Group()
-    screenspace.position.z = -camera.near
+    // Define a screen space that auto-scales to our width and height
+    let screenspace = new ScreenSpace(this);
+    // Needs to be a child of the camera
     camera.add(screenspace)
+    
+    let screenspace2 = new THREE.Sprite()
+    screenspace2.position.z = -camera.near
+    camera.add(screenspace2)
     
     // Cube is centered on origin, with faces 0.5 away in all directions
     let screenCube = new THREE.Mesh(geometry, material)
-    screenspace.add(screenCube)
+    screenspace2.add(screenCube)
     screenCube.scale.x = 10
     screenCube.scale.y = 10
     screenCube.scale.z = 1E-9
     screenCube.position.x = 5
     screenCube.position.y = 5
     screenCube.position.z = -1E-9/2
-
+    
     let fontUrl = 'https://unpkg.com/three@0.113.2/examples/fonts/helvetiker_regular.typeface.json'
     getFont(fontUrl).then((font) => {
 
@@ -175,11 +222,13 @@ export default class SystemView extends HTMLElement {
         // Scale so that screen space runs in pixels to 1 across the whole screen
         // Note that 0,0 is bottom left and not top left.
         // Note also that anything with nonzero thickness will zoom off into space.
-        screenspace.scale.set(screenSpaceWidth / this.clientWidth, screenSpaceHeight / this.clientHeight, 1.0)
+        screenspace2.scale.set(screenSpaceWidth / this.clientWidth, screenSpaceHeight / this.clientHeight, 1.0)
         // Budge it over to the bottom left
         // Happens after scale
-        screenspace.position.x = -screenSpaceWidth / 2
-        screenspace.position.y = -screenSpaceHeight / 2
+        screenspace2.position.x = -screenSpaceWidth / 2
+        screenspace2.position.y = -screenSpaceHeight / 2
+        
+        console.log(screenspace.position, screenSpace2.position)
         
         if (lastTime != undefined) {
             let delta_seconds = (time - lastTime) / 1000

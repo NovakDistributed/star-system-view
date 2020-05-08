@@ -2,62 +2,6 @@
 import * as THREE from 'https://unpkg.com/three@0.113.2/build/three.module.js'
 
 /**
- * Load a Three.js font from the given URL.
- * Resolves with the loaded font.
- */
-function getFont(fontUrl) {
-  if (typeof getFont.cache === 'undefined') {
-    // Make a cache to map from URL to font
-    getFont.cache = {}
-  }
-
-  if (typeof getFont.cache[fontUrl] === 'undefined') {
-    // Font is not yet loaded.
-    let loader = new THREE.FontLoader()
-
-    return new Promise((resolve, reject) => {
-      // Load the font.
-      loader.load(fontUrl, (font) => {
-        // Resolve and cache when it is loaded
-        getFont.cache[fontUrl] = font
-        resolve(font)
-      }, () => {}, reject)
-    })
-  } else {
-    // Font is loaded, return immediately
-    return getFont.cache[fontUrl]
-  }
-}
-
-/**
- * Get a mesh for text reading the given message.
- * Produces exactly one mesh per text, and caches.
- */
-function getTextMesh(font, message) {
-  if (typeof getTextMesh.cache === 'undefined') {
-    // Make a cache to map from message to font
-    getTextMesh.cache = {}
-  }
-
-  if (typeof getTextMesh.cache[message] === 'undefined') {
-    let material = new THREE.MeshBasicMaterial({
-      color: 0x666600,
-      side: THREE.DoubleSide
-    })
-
-    let shapes = font.generateShapes(message, 100)
-    var geometry = new THREE.ShapeBufferGeometry(shapes)
-    geometry.computeBoundingBox()
-
-    let text = new THREE.Mesh(geometry, material)
-    getTextMesh.cache[message] = text
-    return text
-  } else {
-    return getTextMesh.cache[message]
-  }
-}
-
-/**
  * THREE.js scene node that displays everything in screen space. X/Y 0/0 is at the lower left, and each unit is 1 pixel.
  * Automatically moves around to follow the camera as rendering is happening.
  *
@@ -92,6 +36,116 @@ class ScreenSpace extends THREE.Sprite {
       this.position.x = -screenSpaceWidth / 2
       this.position.y = -screenSpaceHeight / 2
       this.position.z = -camera.near
+    }
+  }
+}
+
+/**
+ * THREE.js scene node which displays an FPS counter as text.
+ * Probably wants to be a child of a ScreenSpace.
+ */
+class FPSCounter extends THREE.Sprite {
+  constructor(screenElement) {
+    super()
+    
+    this.lastUpdateTime = undefined
+    this.frameCount = 0
+    
+    // Cache downloaded fonts.
+    // TODO: share!
+    this.fontCache = {}
+    
+    // Cache rendered font strings.
+    // TODO: cap size? Split glyphs?
+    this.textCache = {}
+    
+    let fontUrl = 'https://unpkg.com/three@0.113.2/examples/fonts/helvetiker_regular.typeface.json'
+    this.getFont(fontUrl).then((font) => {
+
+      // We have a single message (FPS counter) that we update
+      // Track the object
+      this.lastText = undefined
+      
+      let setText = (message) => {
+        if (typeof this.lastText !== 'undefined') {
+          this.remove(this.lastText)
+        }
+
+        let text = this.getTextMesh(font, message)
+        // Scale to a manageable height.
+        this.add(text)
+        this.lastText = text
+      }
+
+      this.onBeforeRender = (renderer, scene, camera, geometry, material, group) => {
+        // On each frame
+      
+        // See what time it is
+        let frameTime = window.performance.now()
+        
+        if (typeof this.lastUpdateTime == 'undefined') {
+          // First frame
+          this.lastUpdateTime = frameTime
+        } else {
+          this.frameCount++
+          let timeSince = frameTime - this.lastUpdateTime 
+          if (timeSince >= 1000) {
+            let fpsNumber = Math.round(this.frameCount / (timeSince / 1000))
+            let fpsString = fpsNumber.toString()
+            // Time to update our counter
+            setText(fpsString)
+            // Reset counters
+            this.frameCount = 0
+            this.lastUpdateTime = frameTime
+          }
+        }
+      }
+    })
+  }
+  
+  /**
+   * Load a Three.js font from the given URL.
+   * Resolves with the loaded font.
+   */
+  getFont(fontUrl) {
+    if (typeof this.fontCache[fontUrl] == 'undefined') {
+      // Font is not yet loaded.
+      let loader = new THREE.FontLoader()
+
+      return new Promise((resolve, reject) => {
+        // Load the font.
+        loader.load(fontUrl, (font) => {
+          // Resolve and cache when it is loaded
+          this.fontCache[fontUrl] = font
+          resolve(font)
+        }, () => {}, reject)
+      })
+    } else {
+      // Font is loaded, return immediately
+      return this.fontCache[fontUrl]
+    }
+  }
+
+  /**
+   * Get a mesh for text reading the given message.
+   * Produces exactly one mesh per text, and caches.
+   */
+  getTextMesh(font, message) {
+    if (typeof this.textCache[message] == 'undefined') {
+      let material = new THREE.MeshBasicMaterial({
+        color: 0x666600,
+        side: THREE.DoubleSide
+      })
+
+      let shapes = font.generateShapes(message, 100)
+      var geometry = new THREE.ShapeBufferGeometry(shapes)
+      geometry.computeBoundingBox()
+
+      let text = new THREE.Mesh(geometry, material)
+      this.textCache[message] = text
+      return text
+    } else {
+      return this.textCache[message]
     }
   }
 }
@@ -150,46 +204,14 @@ export default class SystemView extends HTMLElement {
     screenCube.position.y = 5
     screenCube.position.z = -1E-9/2
     
-    let fontUrl = 'https://unpkg.com/three@0.113.2/examples/fonts/helvetiker_regular.typeface.json'
-    getFont(fontUrl).then((font) => {
-
-      // We have a single message (FPS counter) that we update
-      // Track the object
-      let lastText = undefined
-      
-      let setText = (message) => {
-        if (typeof lastText !== 'undefined') {
-          screenspace.remove(lastText)
-        }
-
-        let text = getTextMesh(font, message)
-        // Scale to a manageable height. TODO: how big is the text officially?
-        // Different strings have different bounding boxes.
-        let shrink = 1
-        text.scale.set(shrink, shrink, shrink)
-        // Position it so we can see it
-        text.position.z = 0
-        text.position.y = 0
-        text.position.x = 0
-        screenspace.add(text)
-        lastText = text
-      }
-
-      let updateFPS = () => {
-        setText(Math.round(this.fps).toString())
-        setTimeout(updateFPS, 1000)
-      }
-
-      updateFPS()
-    })
+    let fpsCounter = new FPSCounter()
+    screenspace.add(fpsCounter)
+    
 
     camera.position.z = 5
 
     // Have a global time stream, even between adds/removes to the document
     let lastTime = undefined
-
-    // Track frames per second
-    this.fps = 0
 
     // Track whether we should be rendering or not.
     // We really should only be trying to run animation frames when in the DOM.
@@ -212,9 +234,6 @@ export default class SystemView extends HTMLElement {
             let delta_seconds = (time - lastTime) / 1000
             cube.rotation.x += 1 * delta_seconds
             cube.rotation.y += 1 * delta_seconds
-
-            // Record rendering FPS
-            this.fps = 1/delta_seconds
         }
         lastTime = time
 
